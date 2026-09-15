@@ -1,0 +1,13 @@
+{
+  "name": "@digizu/laravel-page-editor",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test tests/js/*.test.js"
+  },
+  "devDependencies": {
+    "alpinejs": "3.13.0",
+    "esbuild": "0.18.20"
+  }
+}

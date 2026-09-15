@@ -1,0 +1,25 @@
+{
+    "name": "digizu/laravel-page-editor",
+    "description": "On-page Blade text editing with JSON drafts and revision history.",
+    "type": "library",
+    "require": {
+        "php": "^8.3",
+        "illuminate/support": "^13.0",
+        "illuminate/http": "^13.0",
+        "illuminate/routing": "^13.0",
+        "illuminate/view": "^13.0",
+        "ext-dom": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "Digizu\\PageEditor\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Digizu\\PageEditor\\PageEditorServiceProvider"
+            ]
+        }
+    }
+}
