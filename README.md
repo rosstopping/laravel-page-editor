@@ -1,10 +1,17 @@
 # Laravel Page Editor
 
-A local Composer package (`digizu/laravel-page-editor`) for on-page editing, draft/published overrides and revision history. Its auto-discovered provider owns the middleware, routes, components and permission gate. No Nova dependency, controller changes, layout wrapper, asset imports or consumer-side build is required.
+A Laravel Composer package (`digizu/laravel-page-editor`) for on-page editing, draft/published overrides and revision history. Its auto-discovered provider owns the middleware, routes, components and permission gate. No Nova dependency, controller changes, layout wrapper, asset imports or consumer-side build is required.
 
 ## Installation
 
-1. Install through a Composer path repository during development, or a Composer repository after release.
+This package is currently in beta. Its API and behaviour may change before a stable release.
+
+1. Install from Packagist:
+
+   ```sh
+   composer require digizu/laravel-page-editor:"^0.1.0@beta"
+   ```
+
 2. Publish configuration with `php artisan vendor:publish --tag=page-editor-config`.
 3. Set `allowed_emails` (empty by default). `guard: null` uses Laravel's default authenticated session.
 4. Wrap editable body text in Blade:
@@ -107,6 +114,10 @@ Writes use file locks, atomic rename and optimistic version checks. Scoped stora
 The web-session endpoint requires CSRF, an allowlisted email, throttling and a session-bound manifest of fields actually rendered by the server. Manifests expire after two hours; reload to refresh. The last 20 editor loads are retained per session. Drafts are never emitted to visitors. Editable HTML responses use private/no-store caching.
 
 Formatted body values use the `__cms_html__:` marker; legacy plain text remains escaped. Saving/rendering reconstruct only strong/em/u/br tags without attributes. Title and meta-description overrides are escaped plain text. There is no arbitrary HTML, script or structural editing; image uploads are handled separately as described below.
+
+## License
+
+The package is released under the [MIT License](LICENSE). The bundled Inter font retains its [SIL Open Font License](dist/Inter-LICENSE.txt).
 
 ## Package development
 

@@ -2,6 +2,7 @@
     "name": "digizu/laravel-page-editor",
     "description": "On-page Blade text editing with JSON drafts and revision history.",
     "type": "library",
+    "license": "MIT",
     "require": {
         "php": "^8.3",
         "illuminate/support": "^13.0",
