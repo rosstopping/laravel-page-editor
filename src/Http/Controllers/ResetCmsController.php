@@ -30,7 +30,7 @@ class ResetCmsController
             abort_unless(Storage::disk($disk)->deleteDirectory($images), 500, 'Could not clear CMS image uploads.');
         }
         // Only CMS JSON documents; keep lock files so existing lock handles remain valid.
-        foreach (File::glob($directory.'/*.json') as $path) {
+        foreach (array_merge(File::glob($directory.'/*.json'), File::glob($directory.'/pages/*.json')) as $path) {
             abort_unless(File::delete($path), 500, 'Could not clear CMS content.');
         }
         $request->session()->forget(['page-editor.manifests', 'page-editor.published']);

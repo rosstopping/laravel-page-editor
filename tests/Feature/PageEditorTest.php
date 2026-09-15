@@ -186,12 +186,13 @@ class PageEditorTest extends TestCase
         $payload = ['manifest' => $a['state']['manifest'], 'version' => $a['state']['version'], 'action' => 'publish', 'content' => $a['state']['defaults']];
         $this->postJson($endpoint, $payload)->assertOk();
         $this->get('/admin/scope-b')->assertSee('Newsletter default')->assertDontSee('Shared newsletter');
-        $this->assertSame([], app(PageContentStore::class)->read('_scoped')['published']);
+        $this->assertSame([], app(PageContentStore::class)->readScoped()['published']);
     }
     public function test_adopting_legacy_overrides_keeps_published_values_private_until_publish_and_reset_does_not_resurrect_them(): void
     {
         $store = app(PageContentStore::class);
-        $store->change('old-page', 0, 'publish', ['heading' => 'Legacy published'], 123);
+        mkdir($this->directory, 0750, true);
+        file_put_contents($this->directory.'/old-page.json', json_encode(['version' => 1, 'draft' => ['heading' => 'Legacy published'], 'published' => ['heading' => 'Legacy published'], 'history' => []]));
         $scope = 'view:resources/views/components/shared.blade.php';
         $request = \Illuminate\Http\Request::create('/old-page');
         $context = new \Digizu\PageEditor\Services\PageEditorContext($request, true, true);
@@ -205,7 +206,7 @@ class PageEditorTest extends TestCase
         $store->changeScoped(1, 'publish', [], $context->fields, [], 123);
         $reset = new \Digizu\PageEditor\Services\PageEditorContext($request, false, false);
         $this->assertSame('Default', $reset->text('heading', 'Default', 'rich', $scope));
-        $this->assertSame(['heading' => 'Legacy published'], $store->read('old-page')['published']);
+        $this->assertSame(['heading' => 'Legacy published'], $store->read('page-'.hash('sha256', 'old-page'), 'old-page')['published']);
     }
     public function test_images_validate_uploads_and_keep_draft_replacements_private(): void
     {
@@ -271,23 +272,29 @@ class PageEditorTest extends TestCase
     }
     public function test_reset_is_local_only_and_clears_only_cms_content_and_uploads(): void
     {
-        $this->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class);
+        $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\PreventRequestForgery::class);
         \Illuminate\Support\Facades\Storage::fake('public');
         $disk = \Illuminate\Support\Facades\Storage::disk('public');
         $disk->put('cms-images/upload.jpg', 'cms upload');
         $disk->put('existing-site/photo.jpg', 'keep');
         $store = app(PageContentStore::class);
         $store->change('fixture', 0, 'publish', ['heading' => 'Edited'], 123);
+        file_put_contents($this->directory.'/legacy.json', '{}');
+        file_put_contents($this->directory.'/_scoped.json', '{}');
+        file_put_contents($this->directory.'/keep.txt', 'keep');
         $this->app->instance('env', 'production');
         $this->postJson('/_editor/local/reset', ['confirm' => true])->assertNotFound();
-        $this->assertFileExists($this->directory.'/fixture.json');
+        $this->assertFileExists($this->directory.'/pages/'.hash('sha256', 'fixture').'.json');
         $this->app->instance('env', 'local');
         $this->postJson('/_editor/local/reset', ['confirm' => true])->assertForbidden();
         $this->editor();
         $this->get('/admin/editor-fixture?edit=1')->assertSee('Reset CMS');
         $this->postJson('/_editor/local/reset', [])->assertUnprocessable();
         $this->postJson('/_editor/local/reset', ['confirm' => true])->assertOk()->assertJsonPath('reset', true);
-        $this->assertFileDoesNotExist($this->directory.'/fixture.json');
+        $this->assertFileDoesNotExist($this->directory.'/pages/'.hash('sha256', 'fixture').'.json');
+        $this->assertFileDoesNotExist($this->directory.'/legacy.json');
+        $this->assertFileDoesNotExist($this->directory.'/_scoped.json');
+        $this->assertFileExists($this->directory.'/keep.txt');
         $disk->assertMissing('cms-images/upload.jpg');
         $disk->assertExists('existing-site/photo.jpg');
         $this->assertNull(session('page-editor.manifests'));
@@ -325,7 +332,7 @@ class PageEditorTest extends TestCase
             $this->postJson($endpoint, $payload)->assertOk();
 
             config(['editor-test.default' => 'New code default']);
-            $file = $this->directory.'/'.($scope === 'page' ? $page : '_scoped').'.json';
+            $file = $this->directory.'/'.($scope === 'page' ? 'pages/'.hash('sha256', $page) : '_scoped').'.json';
             $before = file_get_contents($file);
             $this->get($path)->assertSee('New code default')->assertDontSee('Published CMS edit')->assertSee('Keep this edit');
             $updated = $boot();
@@ -420,10 +427,39 @@ class PageEditorTest extends TestCase
         foreach (['', 'javascript:alert(1)', 'data:text/html,test', '//example.com', '/\\example.com', "https://example.com\n", 'mailto:bad', 'mailto:hello@example.com?subject=x%0ABcc:other@example.com', 'tel:abc'] as $url) {
             $this->assertFalse(\Digizu\PageEditor\Services\LinkValue::safeUrl($url), $url);
         }
-        app(PageContentStore::class)->change('legacy-link', 0, 'publish', ['cta' => 'Existing label'], 123);
+        mkdir($this->directory, 0750, true);
+        file_put_contents($this->directory.'/legacy-link.json', json_encode(['version' => 1, 'draft' => ['cta' => 'Existing label'], 'published' => ['cta' => 'Existing label'], 'history' => []]));
         $context = new \Digizu\PageEditor\Services\PageEditorContext(\Illuminate\Http\Request::create('/legacy-link'), false, false);
         $value = $context->text('cta', json_encode(['href' => '/reviews', 'text' => 'Read reviews']), 'link');
         $this->assertSame(['href' => '/reviews', 'text' => 'Existing label'], json_decode($value, true));
+    }
+
+    public function test_reserved_page_publish_is_isolated_and_old_manifests_require_reload(): void
+    {
+        $store = app(PageContentStore::class);
+        $fields = ['heading' => ['storage' => 'unrelated-heading', 'default' => 'Default', 'format' => 'rich']];
+        $store->changeScoped(0, 'publish', ['heading' => 'Unrelated published'], $fields, [], 123);
+        $store->changeScoped(1, 'draft', ['heading' => 'Unrelated private draft'], $fields, [], 123);
+        $before = $store->readScoped();
+        Route::middleware('web')->get('/_scoped', fn () => '<html><head><title>Reserved page</title></head><body>Page</body></html>');
+        $this->editor();
+        $html = $this->get('/_scoped?edit=1')->assertOk()->getContent();
+        preg_match('/<script[^>]*id="cms-bootstrap"[^>]*>(.*?)<\/script>/s', $html, $match);
+        $bootstrap = json_decode($match[1], true, flags: JSON_THROW_ON_ERROR);
+        $this->assertStringNotContainsString('Unrelated', json_encode($bootstrap));
+        $token = $bootstrap['state']['manifest'];
+        $manifest = session('page-editor.manifests.'.$token);
+        $payload = ['manifest' => $token, 'version' => $bootstrap['state']['version'], 'action' => 'publish',
+            'content' => array_replace($bootstrap['state']['draft'], ['seo_title' => 'New title'])];
+        $this->postJson('/_editor/'.$manifest['page'], $payload)->assertOk()->assertDontSee('Unrelated');
+        $this->assertSame($before, $store->readScoped());
+        $this->get('/_scoped')->assertSee('<title>New title</title>', false);
+
+        unset($manifest['storage_version']);
+        session()->put('page-editor.manifests.'.$token, $manifest);
+        $payload['version']++;
+        $this->postJson('/_editor/'.$manifest['page'], $payload)->assertConflict();
+        $this->assertSame($before, $store->readScoped());
     }
 
 }

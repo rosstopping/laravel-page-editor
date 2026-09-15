@@ -17,6 +17,7 @@ class PageEditorController extends \Illuminate\Routing\Controller
         abort_unless(is_string($token) && preg_match('/^[a-zA-Z0-9]{40}$/', $token), 403);
         $manifest = $request->session()->get('page-editor.manifests.'.$token);
         abort_unless($manifest && $manifest['page'] === $page && $manifest['at'] >= time() - 7200, 403, 'Reload the editor to refresh your session.');
+        abort_unless(($manifest['storage_version'] ?? null) === 2, 409, 'The editor was upgraded. Reload before saving again.');
         foreach ($manifest['fields'] as $field) abort_unless(isset($field['storage']), 409, 'The editor was upgraded. Reload before saving again.');
         $defaults = array_map(fn ($field) => $field['default'], $manifest['fields']);
         $rules = [
@@ -47,7 +48,7 @@ class PageEditorController extends \Illuminate\Routing\Controller
         $content = array_filter($content, fn ($value, $key) => $value !== $defaults[$key], ARRAY_FILTER_USE_BOTH);
         $state = ($manifest['scoped'] ?? false)
             ? $store->changeScoped($data['version'], $data['action'], $content, $manifest['fields'], $manifest['published'] ?? [], $user->getAuthIdentifier())
-            : $store->change($page, $data['version'], $data['action'], $content, $user->getAuthIdentifier(), $manifest['fields']);
+            : $store->change($page, $data['version'], $data['action'], $content, $user->getAuthIdentifier(), $manifest['fields'], $manifest['legacy_page'] ?? null);
         if ($data['action'] === 'publish') $request->session()->flash('page-editor.published.'.$page, 'Published. Visitors now see this version.');
         if ($data['action'] === 'publish') $state['redirect_url'] = $manifest['exit_url'] ?? null;
         return response()->json($state)

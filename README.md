@@ -164,6 +164,12 @@ Publishing a value identical to its default removes the override.
 
 In `APP_ENV=local`, **Reset CMS** permanently deletes all CMS content, history, and files in the configured CMS image directory. Use a dedicated upload directory.
 
+### Upgrading the content store
+
+Page files now use hashed names under `page-content/pages/`, separate from shared content. Existing page files are read through a compatibility fallback and migrated on their next page save; the originals are retained. Back up the entire content directory.
+
+Deploy the update to all instances together and restart long-running workers so old and new storage writers do not run at the same time. Reload open editors before saving. Legacy files using reserved internal names are not imported as page content.
+
 ## License
 
 [MIT](LICENSE). The bundled Inter font uses the [SIL Open Font License](dist/Inter-LICENSE.txt).

@@ -12,12 +12,15 @@ class PageEditorContext
     private ?array $shared = null;
     private bool $scoped = false;
     public readonly string $page;
+    private readonly ?string $legacyPage;
 
     public function __construct(public Request $request, public bool $canEdit, public bool $editing)
     {
         $path = $request->path();
-        // Keep existing pilot files compatible; nested paths have collision-free IDs.
-        $this->page = preg_match('/^[a-zA-Z0-9_-]+$/', $path) ? $path : 'page-'.hash('sha256', $path);
+        $this->page = 'page-'.hash('sha256', $path);
+        // Do not treat internal names or literal legacy hash aliases as page data.
+        $this->legacyPage = $path === '_scoped' || preg_match('/\Apage-[a-f0-9]{64}\z/', $path)
+            ? null : (preg_match('/\A[a-zA-Z0-9_-]{1,100}\z/', $path) ? $path : $this->page);
     }
 
     public function text(string $field, string $default, string $format = 'rich', ?string $scope = null): string
@@ -26,11 +29,12 @@ class PageEditorContext
         $key = $scope ? SourceScope::key($scope, $field) : $field;
         if (isset($this->fields[$key]) && $this->fields[$key]['default'] !== $default) throw new \InvalidArgumentException('Duplicate editable field with different defaults: '.$field);
         $this->scoped = $this->scoped || $scope !== null;
+        // Keep existing shared-store identities for safe legacy page names.
         $this->fields[$key] = [
             'label' => Str::headline(preg_replace('/^home_/', '', $field)),
             'default' => $default, 'format' => $format, 'legacy' => $field,
             'shared' => SourceScope::isShared($scope),
-            'storage' => SourceScope::key($scope ?? 'page:'.$this->page, $field),
+            'storage' => SourceScope::key($scope ?? 'page:'.($this->legacyPage ?? $this->page), $field),
         ];
         $state = $this->state();
         return ($this->editing ? $state['draft'] : $state['published'])[$key] ?? $default;
@@ -38,12 +42,12 @@ class PageEditorContext
 
     public function state(): array
     {
-        $legacy = $this->stored ??= app(PageContentStore::class)->read($this->page);
-        $shared = $this->shared ??= app(PageContentStore::class)->read('_scoped');
+        $legacy = $this->stored ??= app(PageContentStore::class)->read($this->page, $this->legacyPage);
+        $shared = $this->shared ??= app(PageContentStore::class)->readScoped();
         // A page that was saved using scoped storage must keep reading its metadata there.
         $usesShared = $this->scoped;
         foreach ($this->fields as $field) $usesShared = $usesShared || isset($shared['managed'][$field['storage']]);
-        if (!$usesShared) return $this->applyDefaults($legacy);
+        if (!$usesShared) return $this->applyDefaults(PageContentStore::projectPage($legacy, $this->fields));
         $this->scoped = true;
         $state = PageContentStore::project($shared, $this->fields);
         foreach ($this->fields as $key => $field) {
@@ -85,7 +89,7 @@ class PageEditorContext
         // A session-bound manifest authorises only fields actually rendered by the server.
         $token = Str::random(40);
         $manifests = $this->request->session()->get('page-editor.manifests', []);
-        $manifests[$token] = ['page' => $this->page, 'exit_url' => $this->request->fullUrlWithoutQuery(['edit']), 'fields' => $this->fields, 'scoped' => $this->scoped, 'published' => $state['published'], 'at' => time()];
+        $manifests[$token] = ['storage_version' => 2, 'legacy_page' => $this->legacyPage, 'page' => $this->page, 'exit_url' => $this->request->fullUrlWithoutQuery(['edit']), 'fields' => $this->fields, 'scoped' => $this->scoped, 'published' => $state['published'], 'at' => time()];
         $this->request->session()->put('page-editor.manifests', array_slice($manifests, -20, null, true));
         $state['manifest'] = $token;
         return $state;

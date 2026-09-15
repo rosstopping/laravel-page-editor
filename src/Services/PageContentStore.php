@@ -6,33 +6,75 @@ use RuntimeException;
 
 class PageContentStore
 {
-    public function read(string $page): array
+    public function read(string $page, ?string $legacyPage = null): array
     {
-        return $this->locked($page, fn ($state) => $state);
+        $path = $this->pagePath($page);
+        clearstatcache(true, $path);
+        if (!is_file($path) && $legacyPage !== null && $legacyPage !== '_scoped') {
+            $this->validatePage($legacyPage);
+            $path = config('page-editor.path').'/'.$legacyPage.'.json';
+        }
+        return $this->readFile($path);
     }
 
-    public function change(string $page, int $version, string $action, array $content, int|string $userId, array $fields = []): array
+    public function readScoped(): array
     {
-        return $this->locked($page, function ($state) use ($version, $action, $content, $userId, $fields) {
+        return $this->readFile(config('page-editor.path').'/_scoped.json');
+    }
+
+    private function validatePage(string $page): void
+    {
+        abort_unless(preg_match('/\A[a-zA-Z0-9_-]{1,100}\z/', $page), 404);
+    }
+
+    private function pagePath(string $page): string
+    {
+        $this->validatePage($page);
+        return config('page-editor.path').'/pages/'.hash('sha256', $page).'.json';
+    }
+
+    private function readFile(string $path): array
+    {
+        clearstatcache(true, $path);
+        if (!is_file($path)) {
+            return [
+                'version' => 0, 'draft' => [], 'published' => [],
+                'history' => [['version' => 0, 'action' => 'original', 'at' => null, 'user_id' => null, 'content' => []]],
+            ];
+        }
+
+        // Writers atomically replace the JSON file, so an open reader sees one
+        // complete snapshot without creating directories or acquiring a lock.
+        $json = file_get_contents($path);
+        if ($json === false) throw new RuntimeException('Unable to read page content.');
+        return json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+    }
+
+    public function change(string $page, int $version, string $action, array $content, int|string $userId, array $fields = [], ?string $legacyPage = null): array
+    {
+        $state = $this->locked($this->pagePath($page), fn () => $this->read($page, $legacyPage), function ($state) use ($version, $action, $content, $userId, $fields) {
             abort_if($state['version'] !== $version, 409, 'Someone else saved this page. Reload before editing again.');
             $this->discardOutdated($state, $fields);
             $this->recordFingerprints($state, $fields, $action);
-            $state['draft'] = $content;
-            if ($action === 'publish') $state['published'] = $content;
+            foreach ($action === 'publish' ? ['draft', 'published'] : ['draft'] as $kind) {
+                $state[$kind] = $fields ? array_replace(array_diff_key($state[$kind], $fields), $content) : $content;
+            }
             $state['version']++;
             array_unshift($state['history'], [
                 'version' => $state['version'], 'action' => $action,
-                'at' => now()->toIso8601String(), 'user_id' => $userId, 'content' => $content,
+                'at' => now()->toIso8601String(), 'user_id' => $userId, 'content' => $state['draft'],
+                'changed' => array_keys($fields ?: $content),
             ]);
             $state['history'] = array_slice($state['history'], 0, 50);
             return $state;
-        }, true);
+        });
+        return $fields ? self::projectPage($state, $fields) : $state;
     }
 
     /** One transaction for all fields in a page, including shared components and SEO. */
     public function changeScoped(int $version, string $action, array $content, array $fields, array $published, int|string $userId): array
     {
-        $state = $this->locked('_scoped', function ($state) use ($version, $action, $content, $fields, $published, $userId) {
+        $state = $this->locked(config('page-editor.path').'/_scoped.json', fn () => $this->readScoped(), function ($state) use ($version, $action, $content, $fields, $published, $userId) {
             abort_if($state['version'] !== $version, 409, 'Content changed in another editor. Reload before editing again.');
             $storageFields = [];
             foreach ($fields as $field) $storageFields[$field['storage']] = $field;
@@ -58,7 +100,14 @@ class PageContentStore
             ]);
             $state['history'] = array_slice($state['history'], 0, 50);
             return $state;
-        }, true);
+        });
+        return self::project($state, $fields);
+    }
+
+    public static function projectPage(array $state, array $fields): array
+    {
+        foreach ($fields as $key => &$field) $field['storage'] = $key;
+        unset($field);
         return self::project($state, $fields);
     }
 
@@ -75,7 +124,9 @@ class PageContentStore
         $history = [];
         foreach ($state['history'] as $entry) {
             if (isset($entry['changed']) && !array_intersect($entry['changed'], array_column($fields, 'storage'))) continue;
-            $entry['content'] = $select($entry['content']);
+            $content = $select($entry['content']);
+            if ($entry['content'] && !$content) continue;
+            $entry['content'] = $content;
             unset($entry['changed']);
             $history[] = $entry;
         }
@@ -116,32 +167,24 @@ class PageContentStore
         }
     }
 
-    private function locked(string $page, callable $callback, bool $write = false): array
+    private function locked(string $path, callable $read, callable $callback): array
     {
-        abort_unless(preg_match('/^[a-zA-Z0-9_-]{1,100}$/', $page), 404);
-        $directory = config('page-editor.path');
+        $directory = dirname($path);
         if (!is_dir($directory) && !mkdir($directory, 0750, true) && !is_dir($directory)) {
             throw new RuntimeException('Unable to create page content directory.');
         }
-        $path = $directory.'/'.$page.'.json';
-        $lock = fopen($directory.'/'.$page.'.lock', 'c');
+        $lock = fopen(substr($path, 0, -5).'.lock', 'c');
         if (!$lock) throw new RuntimeException('Unable to lock page content.');
         try {
-            if (!flock($lock, $write ? LOCK_EX : LOCK_SH)) throw new RuntimeException('Unable to lock page content.');
-            $state = is_file($path) ? json_decode(file_get_contents($path), true, 512, JSON_THROW_ON_ERROR) : [
-                'version' => 0, 'draft' => [], 'published' => [],
-                'history' => [['version' => 0, 'action' => 'original', 'at' => null, 'user_id' => null, 'content' => []]],
-            ];
-            $result = $callback($state);
-            if ($write) {
-                $temporary = tempnam($directory, '.content-');
-                try {
-                    if (file_put_contents($temporary, json_encode($result, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR)) === false || !rename($temporary, $path)) {
-                        throw new RuntimeException('Unable to save page content.');
-                    }
-                } finally {
-                    if (is_file($temporary)) unlink($temporary);
+            if (!flock($lock, LOCK_EX)) throw new RuntimeException('Unable to lock page content.');
+            $result = $callback($read());
+            $temporary = tempnam($directory, '.content-');
+            try {
+                if (file_put_contents($temporary, json_encode($result, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR)) === false || !rename($temporary, $path)) {
+                    throw new RuntimeException('Unable to save page content.');
                 }
+            } finally {
+                if (is_file($temporary)) unlink($temporary);
             }
             return $result;
         } finally {
