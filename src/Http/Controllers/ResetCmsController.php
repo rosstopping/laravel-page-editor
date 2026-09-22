@@ -26,13 +26,15 @@ class ResetCmsController
         $resolved = realpath($directory);
         abort_if($resolved && in_array($resolved, array_filter([realpath(base_path()), realpath(storage_path()), realpath(storage_path('app')), realpath(storage_path('app/public')), DIRECTORY_SEPARATOR]), true), 422, 'Reset requires a dedicated CMS content directory.');
 
-        if (Storage::disk($disk)->directoryExists($images)) {
-            abort_unless(Storage::disk($disk)->deleteDirectory($images), 500, 'Could not clear CMS image uploads.');
-        }
-        // Only CMS JSON documents; keep lock files so existing lock handles remain valid.
-        foreach (array_merge(File::glob($directory.'/*.json'), File::glob($directory.'/pages/*.json')) as $path) {
-            abort_unless(File::delete($path), 500, 'Could not clear CMS content.');
-        }
+        app(\Digizu\PageEditor\Services\PageContentStore::class)->transaction(function () use ($disk, $images, $directory) {
+            if (Storage::disk($disk)->directoryExists($images)) {
+                abort_unless(Storage::disk($disk)->deleteDirectory($images), 500, 'Could not clear CMS image uploads.');
+            }
+            // Only CMS JSON documents; keep lock files so existing lock handles remain valid.
+            foreach (array_merge(File::glob($directory.'/*.json'), File::glob($directory.'/pages/*.json')) as $path) {
+                abort_unless(File::delete($path), 500, 'Could not clear CMS content.');
+            }
+        });
         $request->session()->forget(['page-editor.manifests', 'page-editor.published']);
 
         return response()->json(['reset' => true])->header('Cache-Control', 'private, no-store');

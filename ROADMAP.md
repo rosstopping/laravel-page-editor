@@ -4,6 +4,8 @@ Keep the editor portable, lightweight and independent of Nova. Markup remains th
 
 ## Delivered
 
+- [x] Whole-site CMS export/import from the editor, including uploaded images and portable image URLs.
+
 - [x] Session undo/redo across text, formatting, metadata, image changes and revision restores.
 - [x] Shared content badges and an explanation of where published changes apply.
 - [x] Reusable image library for existing CMS uploads with thumbnails and pagination.

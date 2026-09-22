@@ -9,6 +9,7 @@ export default (initial, fields, endpoint, csrf, exitUrl) => ({
     version: initial.version,
     history: initial.history,
     fields,
+    importArchive: null,
     undoStack: [],
     redoStack: [],
     observed: JSON.stringify(initial.draft),
@@ -193,7 +194,7 @@ export default (initial, fields, endpoint, csrf, exitUrl) => ({
         return Object.keys(this.content).filter(key => this.content[key] !== saved[key]).length;
     },
     get statusLabel() {
-        if (this.busy) return { upload: 'Uploading image…', publish: 'Publishing…', reset: 'Resetting CMS…', draft: 'Saving draft…' }[this.operation] || 'Working…';
+        if (this.busy) return { upload: 'Uploading image…', publish: 'Publishing…', reset: 'Resetting CMS…', export: 'Exporting CMS…', import: 'Importing CMS…', draft: 'Saving draft…' }[this.operation] || 'Working…';
         if (this.dirty) return `${this.changedCount} unsaved ${this.changedCount === 1 ? 'field' : 'fields'}`;
         return 'No unsaved changes';
     },
@@ -491,6 +492,54 @@ export default (initial, fields, endpoint, csrf, exitUrl) => ({
         }
         this.replaceContent(restored);
         this.notify('Revision loaded for preview. Save draft or publish to apply it.');
+    },
+    async exportCms(url) {
+        if (this.busy || this.dirty) return;
+        this.operation = 'export';
+        this.busy = true;
+        this.dismissNotification();
+        try {
+            const response = await fetch(url, {
+                method: 'POST', headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
+            });
+            if (!response.ok) throw new Error(await this.transferError(response, 'Could not export CMS content.'));
+            const objectUrl = URL.createObjectURL(await response.blob());
+            const link = document.createElement('a');
+            link.href = objectUrl;
+            link.download = 'cms-export-' + new Date().toISOString().replace(/[:.]/g, '-') + '.zip';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+            this.notify('CMS export downloaded. Keep it private: it includes drafts and revision history.');
+        } catch (error) { this.notify(error.message, true); }
+        finally { this.busy = false; }
+    },
+    async importCms(url) {
+        if (this.busy || !this.importArchive) return;
+        if (!window.confirm('Import CMS content into ' + window.location.host + '? This replaces saved drafts, published content and revision history across the entire site. Published changes go live immediately and unsaved edits will be discarded. Export a backup first. Continue?')) return;
+        this.operation = 'import';
+        this.busy = true;
+        this.dismissNotification();
+        try {
+            const body = new FormData();
+            body.append('archive', this.importArchive);
+            body.append('confirm', '1');
+            const response = await fetch(url, {
+                method: 'POST', headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf }, body,
+            });
+            if (!response.ok) throw new Error(await this.transferError(response, 'Could not import CMS content.'));
+            this.baseline = JSON.stringify(this.content);
+            window.removeEventListener?.('beforeunload', this.warn);
+            window.location.assign(exitUrl || window.location.pathname);
+        } catch (error) { this.notify(error.message, true); }
+        finally { this.busy = false; }
+    },
+    async transferError(response, fallback) {
+        if (response.status === 413) return 'The archive is too large for this server. Check the upload limits.';
+        if ([403, 419].includes(response.status)) return 'Your editing session expired or access was removed. Sign in again.';
+        const result = await response.json().catch(() => ({}));
+        return Object.values(result.errors || {}).flat()[0] || result.message || fallback;
     },
     async resetCms(resetUrl) {
         if (this.busy || !window.confirm('Reset all local CMS content? This deletes drafts, published overrides, revision history and CMS image uploads across every page. This cannot be undone.')) return;

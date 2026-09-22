@@ -21,7 +21,9 @@ class ImageUploadController
         abort_unless($manifest && $manifest['page'] === $page && $manifest['at'] >= time() - 7200
             && ($manifest['fields'][$data['field']]['format'] ?? '') === 'image', 403, 'Reload the editor before uploading.');
         $disk = config('page-editor.images.disk', 'public');
-        $path = $request->file('image')->storePublicly(config('page-editor.images.directory', 'cms-images'), $disk);
+        $path = app(\Digizu\PageEditor\Services\PageContentStore::class)->transaction(
+            fn () => $request->file('image')->storePublicly(config('page-editor.images.directory', 'cms-images'), $disk)
+        );
         abort_unless($path, 500, 'Unable to store image.');
         return response()->json(['src' => Storage::disk($disk)->url($path)])->header('Cache-Control', 'private, no-store');
     }

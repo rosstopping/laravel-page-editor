@@ -15,9 +15,20 @@
             <button type="button" @click="panel = 'content'" :aria-pressed="panel === 'content'">Page content</button>
             <button type="button" @click="panel = 'metadata'" :aria-pressed="panel === 'metadata'">SEO &amp; social</button>
             <button type="button" @click="panel = 'history'" :aria-pressed="panel === 'history'">Revision history</button>
+            <button type="button" @click="panel = 'transfer'" :aria-pressed="panel === 'transfer'">Transfer</button>
         </div>
         <button type="button" x-show="dockLayout !== 'left'" class="cms-tool__icon cms-minimise" @click="minimise()" aria-label="Minimise editor" title="Minimise editor" aria-controls="cms-editor-panel" :aria-expanded="expanded"><span aria-hidden="true">−</span></button>
         </div>
+        <section x-show="panel === 'transfer'" class="cms-transfer" aria-label="Transfer CMS content" :aria-busy="busy">
+            <h2 class="cms-tool__title">Move content between environments</h2>
+            <p class="cms-tool__hint">Export all saved CMS content, drafts, revision history and uploaded images across the site. Save your draft first to include unsaved edits.</p>
+            <div><button type="button" class="cms-tool__button" @click="exportCms(@js(route('page-editor.export')))" :disabled="busy || dirty" x-text="busy &amp;&amp; operation === 'export' ? 'Exporting…' : 'Export CMS'">Export CMS</button></div>
+            <p class="cms-tool__hint"><strong>Import replaces CMS content across this site.</strong> Published content goes live immediately. Export a backup first. Existing image uploads are retained.</p>
+            <label for="cms-import">CMS export ZIP</label>
+            <input id="cms-import" name="cms-import" type="file" accept=".zip,application/zip" x-ref="importArchive" :disabled="busy" @change="importArchive = $event.target.files[0] || null">
+            <p class="cms-tool__hint">Use an export from the same application with matching Blade templates. External image URLs stay unchanged.</p>
+            <div><button type="button" class="cms-tool__button" @click="importCms(@js(route('page-editor.import')))" :disabled="busy || !importArchive" x-text="busy &amp;&amp; operation === 'import' ? 'Importing…' : 'Import CMS'">Import CMS</button></div>
+        </section>
         <div x-show="panel === 'metadata'" class="cms-metadata">
             <p class="cms-tool__hint cms-metadata__intro">Set how this page appears in search results and when shared. Save a draft to keep changes private, or publish to make them live.</p>
             <template x-for="([key, field]) in metadataFields" :key="key">

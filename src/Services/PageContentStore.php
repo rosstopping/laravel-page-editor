@@ -167,7 +167,30 @@ class PageContentStore
         }
     }
 
+    /** Serialize transfers with every content writer; retain this lock file across imports. */
+    public function transaction(callable $callback): mixed
+    {
+        $directory = config('page-editor.path');
+        if (!is_dir($directory) && !mkdir($directory, 0750, true) && !is_dir($directory)) {
+            throw new RuntimeException('Unable to create page content directory.');
+        }
+        $lock = fopen($directory.'/.store.lock', 'c');
+        if (!$lock) throw new RuntimeException('Unable to lock CMS storage.');
+        try {
+            if (!flock($lock, LOCK_EX)) throw new RuntimeException('Unable to lock CMS storage.');
+            return $callback();
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+        }
+    }
+
     private function locked(string $path, callable $read, callable $callback): array
+    {
+        return $this->transaction(fn () => $this->writeLocked($path, $read, $callback));
+    }
+
+    private function writeLocked(string $path, callable $read, callable $callback): array
     {
         $directory = dirname($path);
         if (!is_dir($directory) && !mkdir($directory, 0750, true) && !is_dir($directory)) {

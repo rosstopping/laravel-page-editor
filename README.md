@@ -164,6 +164,20 @@ Publishing a value identical to its default removes the override.
 
 In `APP_ENV=local`, **Reset CMS** permanently deletes all CMS content, history, and files in the configured CMS image directory. Use a dedicated upload directory.
 
+### Moving CMS content between environments
+
+Open **Edit page → Transfer** on the source site and click **Export CMS**. Save any unsaved edits first. On the destination site, open the same section, choose the downloaded ZIP, and click **Import CMS**. This works in either direction, including imports into production, for users on the editor allowlist.
+
+The export includes the entire site's saved drafts, published overrides, revision history, default fingerprints, legacy page files, and JPEG/PNG/WebP/GIF uploads from the configured CMS image directory. It does not include Blade templates, application code, configuration, or externally hosted images. Keep exports private: they include unpublished content and revision author IDs.
+
+**Import replaces CMS content across the destination site; published values go live immediately.** This is a whole-site snapshot, not a field-by-field merge. Export the destination first if you may need to restore its content. Existing destination uploads are retained; imported images get fresh filenames and their URLs are updated in content and history to use the destination disk. Other URLs, including links and external images, remain unchanged.
+
+Use matching application code, field names, scopes, and Blade paths on both environments. Default changes in code still take precedence over imported overrides. Revision author IDs are preserved without mapping users between databases. The importing browser leaves edit mode after success; other open editors must reload before saving.
+
+Transfers require PHP's `ext-zip` extension and a dedicated CMS image directory. Defaults in `page-editor.transfer` allow a 100 MB upload and 500 MB of uncompressed archive data, with a maximum of 10,000 ZIP entries and a 16 MB manifest. Individual images must fit `page-editor.images.max_kb` and the normal image dimension limits. PHP's `upload_max_filesize`, `post_max_size`, web server request limits, and request timeouts also apply. Larger libraries may need these limits adjusted.
+
+Transfers share a storage lock with CMS saves, uploads, and resets. Each content document is replaced atomically, and failed writes attempt to restore the previous documents and remove newly imported images. Keep normal storage backups for process interruptions or storage failures. Visitors can continue reading during transfers; a request spanning multiple documents may observe the transition while they are replaced.
+
 ### Upgrading the content store
 
 Page files now use hashed names under `page-content/pages/`, separate from shared content. Existing page files are read through a compatibility fallback and migrated on their next page save; the originals are retained. Back up the entire content directory.

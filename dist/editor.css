@@ -138,7 +138,7 @@ body.cms-editor-open { padding-bottom: calc(var(--cms-dock-height, 430px) + 24px
 .cms-library-image span { display: block; padding: 5px 0; font-size: 11px; }
 
 #cms-editor-panel { display: flex; flex-direction: column; min-height: 0; }
-#cms-editor-panel > :is(.cms-panel, .cms-metadata, .cms-history-panel) { flex-shrink: 1; min-height: 0; }
+#cms-editor-panel > :is(.cms-panel, .cms-metadata, .cms-history-panel, .cms-transfer) { flex-shrink: 1; min-height: 0; }
 .cms-window-heading { flex-shrink: 0; }
 .cms-tool .cms-code-notice { margin: 12px 16px 0; }
 .cms-content-badges { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -198,7 +198,7 @@ body.cms-editor-open { padding-bottom: calc(var(--cms-dock-height, 430px) + 24px
     .cms-dock[data-layout=left] { top: 16px; bottom: 16px; width: calc(var(--cms-left-space) - 32px); max-width: calc(100vw - 32px); margin: 0; }
     .cms-dock[data-layout=left] { left: 16px; right: auto; }
     .cms-dock[data-layout=left] #cms-editor-panel { flex: 1; }
-    .cms-dock[data-layout=left] :is(.cms-panel, .cms-metadata, .cms-history-panel) { flex: 1; height: auto; min-height: 0; }
+    .cms-dock[data-layout=left] :is(.cms-panel, .cms-metadata, .cms-history-panel, .cms-transfer) { flex: 1; height: auto; min-height: 0; }
     .cms-dock[data-layout=left] .cms-panel { grid-template-columns: minmax(0, 1fr); }
     .cms-dock[data-layout=left] .cms-panel__field { border-right: 0; }
     .cms-dock[data-layout=left] .cms-panel[data-detail=true] .cms-panel__field,
@@ -230,4 +230,13 @@ body.cms-editor-open { padding-bottom: calc(var(--cms-dock-height, 430px) + 24px
     body.cms-editor-left [data-cms-fixed-position=full] { left: var(--cms-left-space) !important; right: 0 !important; width: auto !important; }
     body.cms-editor-left [data-cms-fixed-position=left] { left: calc(var(--cms-original-left) + var(--cms-left-space)) !important; }
     body.cms-editor-left [data-cms-fixed-position=center] { left: calc(var(--cms-original-left) + var(--cms-left-space) / 2) !important; }
+}
+
+.cms-transfer { overflow-y: auto; height: min(420px, 47dvh); align-content: start; flex-shrink: 1; min-height: 0; display: grid; gap: 12px; padding: 20px; max-width: 680px; }
+.cms-transfer input[type="file"] { max-width: 100%; min-width: 0; }
+.cms-transfer .cms-tool__hint { margin: 0; }
+@media (max-width: 767px) {
+    .cms-transfer { padding: 16px; font-size: 16px; }
+    .cms-transfer .cms-tool__hint { font-size: 16px; }
+    .cms-transfer .cms-tool__button { min-height: 48px; }
 }

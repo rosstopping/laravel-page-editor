@@ -22,5 +22,8 @@
                 "Digizu\\PageEditor\\PageEditorServiceProvider"
             ]
         }
+    },
+    "suggest": {
+        "ext-zip": "Required for CMS export and import with uploaded images."
     }
 }

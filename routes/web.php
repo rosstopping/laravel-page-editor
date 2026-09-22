@@ -19,3 +19,6 @@ Route::middleware(['web', 'throttle:20,1'])->post('_editor/{page}/images', \Digi
 Route::middleware(['web', 'throttle:60,1'])->get('_editor/{page}/images', \Digizu\PageEditor\Http\Controllers\ImageLibraryController::class)->name('page-editor.image-library');
 
 Route::middleware(['web', 'throttle:5,1'])->post('_editor/local/reset', \Digizu\PageEditor\Http\Controllers\ResetCmsController::class)->name('page-editor.reset');
+
+Route::middleware(['web', 'throttle:5,1'])->post('_editor/transfer/export', [\Digizu\PageEditor\Http\Controllers\ContentTransferController::class, 'export'])->name('page-editor.export');
+Route::middleware(['web', 'throttle:5,1'])->post('_editor/transfer/import', [\Digizu\PageEditor\Http\Controllers\ContentTransferController::class, 'import'])->name('page-editor.import');

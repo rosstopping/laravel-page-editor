@@ -360,3 +360,57 @@ test('removed right preference falls back to bottom and left remains open until 
     assert.equal(editor.selectedLayout, 'bottom');
     assert.equal(editor.dockLayout, 'bottom');
 });
+
+test('import requires confirmation, sends ZIP with CSRF, and reloads after success', async () => {
+    const editor = pageEditor(initial(), {}, '/save', 'token', '/page');
+    editor.importArchive = new Blob(['archive']);
+    editor.content.title = 'Unsaved';
+    window.confirm = () => false;
+    globalThis.fetch = () => assert.fail('Cancelled import must not submit');
+    await editor.importCms('/import');
+    assert.equal(editor.dirty, true);
+    window.confirm = () => true;
+    let destination;
+    window.location.assign = url => destination = url;
+    globalThis.fetch = async (url, options) => {
+        assert.equal(url, '/import');
+        assert.equal(options.headers['X-CSRF-TOKEN'], 'token');
+        assert.equal(options.body.get('confirm'), '1');
+        assert.equal(await options.body.get('archive').text(), 'archive');
+        return { ok: true };
+    };
+    await editor.importCms('/import');
+    assert.equal(destination, '/page');
+    assert.equal(editor.busy, false);
+    assert.equal(editor.dirty, false);
+});
+
+test('failed import retains unsaved edits and shows validation errors', async () => {
+    const editor = pageEditor(initial(), {}, '/save', 'token');
+    editor.importArchive = new Blob(['bad']);
+    editor.content.title = 'Unsaved';
+    window.confirm = () => true;
+    window.location.assign = () => assert.fail('Failed import must not navigate');
+    globalThis.fetch = async () => ({ ok: false, status: 422, json: async () => ({ errors: { archive: ['Invalid archive.'] } }) });
+    await editor.importCms('/import');
+    assert.equal(editor.error, 'Invalid archive.');
+    assert.equal(editor.dirty, true);
+    assert.equal(editor.busy, false);
+});
+
+test('export blocks unsaved edits and reports server failures', async () => {
+    const editor = pageEditor(initial(), {}, '/save', 'token');
+    editor.content.title = 'Unsaved';
+    globalThis.fetch = () => assert.fail('Save edits before exporting');
+    await editor.exportCms('/export');
+    editor.content.title = 'Original';
+    globalThis.fetch = async (url, options) => {
+        assert.equal(url, '/export');
+        assert.equal(options.method, 'POST');
+        assert.equal(options.headers['X-CSRF-TOKEN'], 'token');
+        return { ok: false, status: 419 };
+    };
+    await editor.exportCms('/export');
+    assert.match(editor.error, /session expired/);
+    assert.equal(editor.busy, false);
+});
