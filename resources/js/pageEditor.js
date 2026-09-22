@@ -1,10 +1,12 @@
 import { toHtml, fromHtml } from './formattedText.js';
 import { safeLinkUrl } from './linkValue.js';
+import { equivalent, comparison, safePreviewImage } from './changes.js';
 import { createSiteLayout } from './siteLayout.js';
 
 export default (initial, fields, endpoint, csrf, exitUrl) => ({
     content: { ...initial.draft },
     defaults: initial.defaults || {},
+    published: { ...(initial.defaults || {}), ...(initial.published || {}) },
     baseline: JSON.stringify(initial.draft),
     version: initial.version,
     history: initial.history,
@@ -122,6 +124,38 @@ export default (initial, fields, endpoint, csrf, exitUrl) => ({
     search: '',
     contentFilter: 'all',
     panel: 'content',
+    changeMode: 'unpublished',
+    highlightChanges: false,
+    safePreviewImage,
+    get changedFields() {
+        const before = this.changeMode === 'unpublished' ? this.published : this.defaults;
+        const after = this.changeMode === 'unpublished' ? this.content : this.published;
+        return Object.entries(this.fields).filter(([key, field]) => !equivalent(before[key] ?? '', after[key] ?? '', field.format))
+            .map(([key, field]) => ({ key, field, before: before[key] ?? '', after: after[key] ?? '' }));
+    },
+    get changeEntries() {
+        return this.changedFields.map(entry => ({ ...entry, ...comparison(entry.before, entry.after, entry.field.format),
+            label: this.isMetadata(entry.key) ? this.metadataLabel(entry.key) : this.fieldLabel(entry.key) }));
+    },
+    isMetadata(key) { return key === 'seo_title' || key === 'seo_description' || Boolean(this.fields[key]?.meta); },
+    reviewField(key) {
+        this.preview = false;
+        this.expanded = true;
+        if (this.isMetadata(key)) {
+            this.panel = 'metadata';
+            this.$nextTick?.(() => document.getElementById('cms-meta-' + key)?.focus());
+        } else {
+            this.selectField(key);
+            this.$nextTick?.(() => this.locateField());
+        }
+    },
+    syncChangeHighlights() {
+        const changed = new Set(this.highlightChanges && !this.preview ? this.changedFields.map(entry => entry.key) : []);
+        for (const element of [...(this.inlineElements || []), ...(this.imageElements || []), ...(this.linkElements || [])]) {
+            const key = element.dataset.editableField || element.dataset.cmsImage || element.dataset.cmsLink;
+            element.classList.toggle('cms-field-changed', changed.has(key));
+        }
+    },
     plainPreview(value) {
         const holder = document.createElement('div');
         holder.innerHTML = toHtml(value || '');
@@ -244,6 +278,9 @@ export default (initial, fields, endpoint, csrf, exitUrl) => ({
         window.addEventListener('keydown', this.onHistoryKey, true);
         this.$watch('preview', () => this.syncDocument());
         this.$watch('busy', () => this.syncDocument());
+        this.$watch('highlightChanges', () => this.syncChangeHighlights());
+        this.$watch('changeMode', () => this.syncChangeHighlights());
+        this.$watch('published', () => this.syncChangeHighlights());
         this.escape = event => {
             if (event.key === 'Escape' && !event.isComposing && !event.defaultPrevented && !this.busy) {
                 event.preventDefault();
@@ -269,6 +306,8 @@ export default (initial, fields, endpoint, csrf, exitUrl) => ({
         clearTimeout(this.checkpointTimer);
         this.libraryRequest++;
         window.removeEventListener('keydown', this.onHistoryKey, true);
+        this.highlightChanges = false;
+        this.syncChangeHighlights();
         document.body.classList.remove('cms-editor-open');
     },
     linkValue(key = this.selected) {
@@ -351,6 +390,7 @@ export default (initial, fields, endpoint, csrf, exitUrl) => ({
         this.syncDocument();
     },
     syncDocument() {
+        this.syncChangeHighlights();
         for (const element of this.linkElements || []) {
             const value = this.linkValue(element.dataset.cmsLink);
             if (safeLinkUrl(value?.href)) element.setAttribute('href', value.href);
@@ -593,6 +633,7 @@ export default (initial, fields, endpoint, csrf, exitUrl) => ({
             const state = await response.json();
             this.version = state.version;
             this.history = state.history;
+            if (state.published) this.published = { ...this.defaults, ...state.published };
             for (const field of Object.values(this.fields)) field.updated_in_code = false;
             this.baseline = JSON.stringify(this.content);
             // Leave immediately after a confirmed publish. The server flashes the

@@ -148,6 +148,17 @@ Renaming a field, moving its source file, or changing its scope changes its stor
 
 Visitors never receive draft content. The store retains the latest 50 site-wide revisions. If another editor saves while your page is open, a version conflict may require reloading.
 
+### Reviewing changes
+
+Open **Changes** in the editor to compare fields on the current page, including shared content and SEO metadata:
+
+- **Unpublished changes** compares your current edits (saved drafts and unsaved edits) with the published page. Saving a draft does not clear this list.
+- **CMS overrides** compares published values with the defaults in Blade. Unpublished edits are excluded.
+
+Text comparisons highlight removed and added words. Links show text and destination changes; images show before/after previews, URLs, and alt text. Expand the formatted appearance comparison to inspect rich text styling; formatting-only changes expand automatically.
+
+Use **Find on page** or **Review SEO** to open a changed field. **Highlight changed fields on the page** adds dashed outlines in edit mode; Preview hides the outlines. Reviewing changes does not save or publish them. This list covers fields rendered on the current page, not a site-wide audit or a code synchronization tool.
+
 ### Changing defaults in code
 
 Defaults stay in Blade. Changing a field's default in code takes precedence over previously saved edits to that field, including published edits. Keep defaults deterministic; avoid request-dependent values or wrapping database-managed content that should remain controlled by your application.

@@ -14,11 +14,61 @@
         <div class="cms-tabs" role="group" aria-label="Editor sections">
             <button type="button" @click="panel = 'content'" :aria-pressed="panel === 'content'">Page content</button>
             <button type="button" @click="panel = 'metadata'" :aria-pressed="panel === 'metadata'">SEO &amp; social</button>
+            <button type="button" @click="panel = 'changes'" :aria-pressed="panel === 'changes'">Changes</button>
             <button type="button" @click="panel = 'history'" :aria-pressed="panel === 'history'">Revision history</button>
             <button type="button" @click="panel = 'transfer'" :aria-pressed="panel === 'transfer'">Transfer</button>
         </div>
         <button type="button" x-show="dockLayout !== 'left'" class="cms-tool__icon cms-minimise" @click="minimise()" aria-label="Minimise editor" title="Minimise editor" aria-controls="cms-editor-panel" :aria-expanded="expanded"><span aria-hidden="true">−</span></button>
         </div>
+        <section x-show="panel === 'changes'" class="cms-changes" aria-label="Content changes">
+            <div class="cms-changes__intro">
+                <h2 class="cms-tool__title">Review changes</h2>
+                <div class="cms-filters" role="group" aria-label="Compare content">
+                    <button type="button" @click="changeMode = 'unpublished'" :aria-pressed="changeMode === 'unpublished'">Unpublished changes</button>
+                    <button type="button" @click="changeMode = 'overrides'" :aria-pressed="changeMode === 'overrides'">CMS overrides</button>
+                </div>
+                <p class="cms-tool__hint" x-text="changeMode === 'unpublished' ? 'Compare your current edits with the published page. Includes saved drafts and unsaved edits on this page, including shared fields.' : 'Compare published content with the defaults in Blade for this page, including shared fields. Unpublished edits are excluded.'"></p>
+                <label class="cms-changes__toggle"><input type="checkbox" name="cms-highlight-changes" x-model="highlightChanges"> Highlight changed fields on the page</label>
+                <p class="cms-tool__hint" x-show="highlightChanges">Dashed outlines mark changed fields in edit mode. SEO changes appear in this list.</p>
+                <p class="cms-tool__hint" role="status" x-text="changedFields.length + (changedFields.length === 1 ? ' changed field' : ' changed fields')"></p>
+                <p class="cms-diff-legend"><span class="cms-diff-removed">Removed</span> <span class="cms-diff-added">Added</span></p>
+            </div>
+            <p class="cms-changes__empty" x-show="changedFields.length === 0" x-text="changeMode === 'unpublished' ? 'No unpublished changes. Your current content matches the published page.' : 'No published overrides. Published content matches the Blade defaults.'"></p>
+            <ul class="cms-changes__list" role="list">
+                <template x-for="change in changeEntries" :key="change.key">
+                    <li class="cms-change">
+                        <div class="cms-change__heading">
+                            <div><h3 class="cms-tool__title" x-text="change.label"></h3><span class="cms-shared-badge" x-show="change.field.shared">Shared content</span></div>
+                            <button type="button" class="cms-tool__button" @click="reviewField(change.key)" :disabled="busy" x-text="isMetadata(change.key) ? 'Review SEO' : 'Find on page'"></button>
+                        </div>
+                        <p class="cms-tool__hint" x-show="change.field.shared">This field is shared with other pages.</p>
+                        <div class="cms-change__columns cms-change__labels" aria-hidden="true"><p x-text="changeMode === 'unpublished' ? 'Published' : 'Blade default'"></p><p x-text="changeMode === 'unpublished' ? 'Current edits' : 'Published override'"></p></div>
+                        <template x-if="change.images">
+                            <div class="cms-change__columns cms-change__images">
+                                <template x-for="side in ['before', 'after']" :key="side">
+                                    <figure><figcaption class="cms-visually-hidden cms-change__side-label" x-text="side === 'before' ? 'Before' : 'After'"></figcaption><img x-show="safePreviewImage(change.images[side].src)" :src="safePreviewImage(change.images[side].src) || null" :alt="change.images[side].alt" loading="lazy"></figure>
+                                </template>
+                            </div>
+                        </template>
+                        <template x-for="row in change.rows" :key="row.label">
+                            <div class="cms-change__row">
+                                <p class="cms-tool__hint" x-text="row.label + (row.changed ? '' : ' (unchanged)')"></p>
+                                <div class="cms-change__columns">
+                                    <div><span class="cms-visually-hidden cms-change__side-label">Before: </span><p class="cms-change__value" x-html="row.before" x-show="!row.emptyBefore"></p><p class="cms-tool__hint" x-show="row.emptyBefore">Empty</p></div>
+                                    <div><span class="cms-visually-hidden cms-change__side-label">After: </span><p class="cms-change__value" x-html="row.after" x-show="!row.emptyAfter"></p><p class="cms-tool__hint" x-show="row.emptyAfter">Empty</p></div>
+                                </div>
+                            </div>
+                        </template>
+                        <template x-if="change.rich">
+                            <details class="cms-change__format" :open="change.formattingOnly">
+                                <summary x-text="change.formattingOnly ? 'Formatting changed — compare appearance' : 'Compare formatted appearance'"></summary>
+                                <div class="cms-change__columns"><div><span class="cms-visually-hidden cms-change__side-label">Before: </span><p class="cms-change__value" x-html="change.rich.before"></p></div><div><span class="cms-visually-hidden cms-change__side-label">After: </span><p class="cms-change__value" x-html="change.rich.after"></p></div></div>
+                            </details>
+                        </template>
+                    </li>
+                </template>
+            </ul>
+        </section>
         <section x-show="panel === 'transfer'" class="cms-transfer" aria-label="Transfer CMS content" :aria-busy="busy">
             <h2 class="cms-tool__title">Move content between environments</h2>
             <p class="cms-tool__hint">Export all saved CMS content, drafts, revision history and uploaded images across the site. Save your draft first to include unsaved edits.</p>

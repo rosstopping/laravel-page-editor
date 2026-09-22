@@ -138,7 +138,7 @@ body.cms-editor-open { padding-bottom: calc(var(--cms-dock-height, 430px) + 24px
 .cms-library-image span { display: block; padding: 5px 0; font-size: 11px; }
 
 #cms-editor-panel { display: flex; flex-direction: column; min-height: 0; }
-#cms-editor-panel > :is(.cms-panel, .cms-metadata, .cms-history-panel, .cms-transfer) { flex-shrink: 1; min-height: 0; }
+#cms-editor-panel > :is(.cms-panel, .cms-metadata, .cms-history-panel, .cms-transfer, .cms-changes) { flex-shrink: 1; min-height: 0; }
 .cms-window-heading { flex-shrink: 0; }
 .cms-tool .cms-code-notice { margin: 12px 16px 0; }
 .cms-content-badges { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -198,7 +198,7 @@ body.cms-editor-open { padding-bottom: calc(var(--cms-dock-height, 430px) + 24px
     .cms-dock[data-layout=left] { top: 16px; bottom: 16px; width: calc(var(--cms-left-space) - 32px); max-width: calc(100vw - 32px); margin: 0; }
     .cms-dock[data-layout=left] { left: 16px; right: auto; }
     .cms-dock[data-layout=left] #cms-editor-panel { flex: 1; }
-    .cms-dock[data-layout=left] :is(.cms-panel, .cms-metadata, .cms-history-panel, .cms-transfer) { flex: 1; height: auto; min-height: 0; }
+    .cms-dock[data-layout=left] :is(.cms-panel, .cms-metadata, .cms-history-panel, .cms-transfer, .cms-changes) { flex: 1; height: auto; min-height: 0; }
     .cms-dock[data-layout=left] .cms-panel { grid-template-columns: minmax(0, 1fr); }
     .cms-dock[data-layout=left] .cms-panel__field { border-right: 0; }
     .cms-dock[data-layout=left] .cms-panel[data-detail=true] .cms-panel__field,
@@ -239,4 +239,43 @@ body.cms-editor-open { padding-bottom: calc(var(--cms-dock-height, 430px) + 24px
     .cms-transfer { padding: 16px; font-size: 16px; }
     .cms-transfer .cms-tool__hint { font-size: 16px; }
     .cms-transfer .cms-tool__button { min-height: 48px; }
+}
+
+
+.cms-changes { height: min(440px, 47dvh); overflow-y: auto; padding: 20px; }
+.cms-changes__intro { display: grid; gap: 12px; }
+.cms-changes__intro .cms-filters { padding: 0; flex-wrap: wrap; }
+.cms-changes__toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.cms-changes__toggle input { width: 18px; height: 18px; accent-color: var(--cms-accent); }
+.cms-changes__list { list-style: none; padding: 0; margin: 16px 0 0; }
+.cms-change { display: grid; gap: 12px; padding: 20px 0; border-top: 1px solid var(--cms-line); }
+.cms-change__heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+.cms-change__heading > div { min-width: 0; overflow-wrap: anywhere; }
+.cms-change__heading > button { flex-shrink: 0; }
+.cms-change__columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.cms-change__columns > * { min-width: 0; }
+.cms-change__labels { font-weight: 600; }
+.cms-change__value { white-space: pre-wrap; overflow-wrap: anywhere; }
+.cms-change__row { display: grid; gap: 6px; }
+.cms-change__images figure { margin: 0; }
+.cms-change__images img { display: block; width: 100%; height: 140px; object-fit: contain; background: #fafafa; border: 1px solid var(--cms-line); border-radius: 6px; }
+.cms-change__format summary { cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.cms-change__format .cms-change__columns { padding-top: 12px; }
+.cms-diff-removed { background: #fff1f2; color: #9f1239; text-decoration: line-through; }
+.cms-diff-added { background: #ecfdf5; color: #065f46; text-decoration: underline; text-underline-offset: 3px; }
+.cms-diff-legend { display: flex; gap: 12px; }
+.cms-changes__empty { padding: 24px 0; }
+.cms-field-changed { outline: 2px dashed #b45309 !important; outline-offset: 4px !important; }
+@media (max-width: 767px) {
+    .cms-changes { height: 40dvh; padding: 16px; font-size: 16px; }
+    .cms-changes .cms-tool__hint { font-size: 16px; }
+    .cms-changes .cms-tool__button, .cms-changes .cms-filters button, .cms-changes__toggle { min-height: 48px; }
+    .cms-change__columns { gap: 12px; }
+}
+
+@media (max-width: 480px) {
+    .cms-change__columns { grid-template-columns: minmax(0, 1fr); }
+    .cms-change__labels { display: none; }
+    .cms-change__side-label { position: static; display: block; width: auto; height: auto; margin: 0; overflow: visible; clip: auto; clip-path: none; white-space: normal; font-weight: 600; }
+    .cms-change__heading { flex-wrap: wrap; }
 }

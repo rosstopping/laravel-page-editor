@@ -41,6 +41,20 @@ class PageEditorTest extends TestCase
         return array_key_last(session('page-editor.manifests'));
     }
 
+    public function test_changes_tab_receives_published_values_and_defaults_separately_from_drafts(): void
+    {
+        $this->editor();
+        $html = $this->get('/admin/editor-fixture?edit=1')->assertOk()
+            ->assertSee('Review changes')->assertSee('Unpublished changes')->assertSee('CMS overrides')
+            ->assertSee('Highlight changed fields on the page')->getContent();
+        preg_match('~<script type="application/json" id="cms-bootstrap">(.*?)</script>~s', $html, $matches);
+        $bootstrap = json_decode($matches[1], true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame('Original heading', $bootstrap['state']['defaults']['title']);
+        $this->assertSame('Original heading', $bootstrap['state']['draft']['title']);
+        $this->assertSame([], $bootstrap['state']['published']);
+        $this->assertArrayHasKey('title', $bootstrap['fields']);
+    }
+
     public function test_only_admins_with_a_rendered_manifest_can_save_known_fields(): void
     {
         $url = '/_editor/'.$this->page;
