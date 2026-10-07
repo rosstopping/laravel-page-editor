@@ -80,13 +80,27 @@
             <div><button type="button" class="cms-tool__button" @click="importCms(@js(route('page-editor.import')))" :disabled="busy || !importArchive" x-text="busy &amp;&amp; operation === 'import' ? 'Importing…' : 'Import CMS'">Import CMS</button></div>
         </section>
         <div x-show="panel === 'metadata'" class="cms-metadata">
-            <p class="cms-tool__hint cms-metadata__intro">Set how this page appears in search results and when shared. Save a draft to keep changes private, or publish to make them live.</p>
-            <template x-for="([key, field]) in metadataFields" :key="key">
-                <div>
-                    <label :for="'cms-meta-' + key" x-text="metadataLabel(key)"></label>
-                    <textarea :id="'cms-meta-' + key" :name="key" x-model="content[key]" :disabled="busy" :rows="key.includes('description') ? 3 : 1" maxlength="2000"></textarea>
-                </div>
-            </template>
+            <p class="cms-tool__hint cms-metadata__intro">Save a draft to keep changes private, or publish to make them live.</p>
+            <fieldset class="cms-metadata__intro cms-metadata-group">
+                <legend class="cms-tool__title">Search engine metadata</legend>
+                <p class="cms-tool__hint">These are the normal page title and meta description used by search engines.</p>
+                <template x-for="([key, field]) in searchMetadataFields" :key="key">
+                    <div>
+                        <label :for="'cms-meta-' + key" x-text="metadataLabel(key)"></label>
+                        <textarea :id="'cms-meta-' + key" :name="key" x-model="content[key]" :disabled="busy" :rows="key === 'seo_description' ? 3 : 1" maxlength="2000"></textarea>
+                    </div>
+                </template>
+            </fieldset>
+            <fieldset class="cms-metadata__intro cms-metadata-group cms-metadata-group--social">
+                <legend class="cms-tool__title">Social sharing tags</legend>
+                <p class="cms-tool__hint">These control link previews when this page is shared on social media or messaging apps. Social description is separate from the meta description above.</p>
+                <template x-for="([key, field]) in socialMetadataFields" :key="key">
+                    <div>
+                        <label :for="'cms-meta-' + key" x-text="metadataLabel(key)"></label>
+                        <textarea :id="'cms-meta-' + key" :name="key" x-model="content[key]" :disabled="busy" :rows="key.includes('description') ? 3 : 1" maxlength="2000"></textarea>
+                    </div>
+                </template>
+            </fieldset>
         </div>
         <div x-show="panel === 'content'" class="cms-panel" :data-detail="Boolean(selected)">
         <div class="cms-panel__field">

@@ -414,3 +414,24 @@ test('export blocks unsaved edits and reports server failures', async () => {
     assert.match(editor.error, /session expired/);
     assert.equal(editor.busy, false);
 });
+
+
+test('search metadata has a stable order and is separate from social tags', () => {
+    const fields = {
+        'og:description': { meta: { name: 'og:description' } },
+        seo_description: {},
+        heading: {},
+        'og:title': { meta: { name: 'og:title' } },
+        seo_title: {},
+        twitter_description: { meta: { name: 'twitter:description' } },
+    };
+    const editor = pageEditor(initial(), fields, '/save', 'token');
+    assert.deepEqual(editor.searchMetadataFields.map(([key]) => key), ['seo_title', 'seo_description']);
+    assert.deepEqual(editor.socialMetadataFields.map(([key]) => key), ['og:description', 'og:title', 'twitter_description']);
+    assert.equal(editor.metadataLabel('seo_title'), 'Meta title (page title)');
+    assert.equal(editor.metadataLabel('seo_description'), 'Meta description');
+    assert.equal(editor.metadataLabel('og:description'), 'Social description');
+    const partial = pageEditor(initial(), { seo_description: {}, heading: {} }, '/save', 'token');
+    assert.deepEqual(partial.searchMetadataFields.map(([key]) => key), ['seo_description']);
+    assert.deepEqual(partial.socialMetadataFields, []);
+});

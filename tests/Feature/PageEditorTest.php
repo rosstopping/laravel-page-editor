@@ -41,6 +41,21 @@ class PageEditorTest extends TestCase
         return array_key_last(session('page-editor.manifests'));
     }
 
+    public function test_metadata_panel_separates_search_and_social_fields(): void
+    {
+        $html = Blade::render('<x-page-editor exit-url="/page" />');
+        $document = new \DOMDocument;
+        @$document->loadHTML($html);
+        $xpath = new \DOMXPath($document);
+        $groups = $xpath->query('//fieldset[contains(@class, "cms-metadata-group")]/legend');
+        $this->assertSame(2, $groups->length);
+        $this->assertSame('Search engine metadata', $groups->item(0)->textContent);
+        $this->assertSame('Social sharing tags', $groups->item(1)->textContent);
+        $this->assertStringContainsString('in searchMetadataFields', $html);
+        $this->assertStringContainsString('in socialMetadataFields', $html);
+        $this->assertStringContainsString('Social description is separate from the meta description above.', $html);
+    }
+
     public function test_changes_tab_receives_published_values_and_defaults_separately_from_drafts(): void
     {
         $this->editor();

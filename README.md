@@ -198,3 +198,10 @@ Deploy the update to all instances together and restart long-running workers so 
 ## License
 
 [MIT](LICENSE). The bundled Inter font uses the [SIL Open Font License](dist/Inter-LICENSE.txt).
+
+### Search and social metadata
+
+The metadata panel shows **Search engine metadata** first: **Meta title (page title)**
+and **Meta description**. The meta description is the normal HTML description
+used by search engines. **Social sharing tags** appear in a separate group and
+control shared-link previews. Existing saved metadata keys and values are unchanged.

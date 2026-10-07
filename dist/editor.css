@@ -279,3 +279,7 @@ body.cms-editor-open { padding-bottom: calc(var(--cms-dock-height, 430px) + 24px
     .cms-change__side-label { position: static; display: block; width: auto; height: auto; margin: 0; overflow: visible; clip: auto; clip-path: none; white-space: normal; font-weight: 600; }
     .cms-change__heading { flex-wrap: wrap; }
 }
+
+.cms-tool .cms-metadata-group { display: grid; gap: 16px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.cms-tool .cms-metadata-group legend { margin-bottom: 12px; }
+.cms-tool .cms-metadata-group--social { border-top: 1px solid var(--cms-line); padding-top: 20px; }

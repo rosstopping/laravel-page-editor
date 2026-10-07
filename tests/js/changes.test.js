@@ -60,7 +60,7 @@ test('comparisons separate unpublished content from published overrides and pres
     editor.content.title = 'Published';
     assert.equal(editor.changedFields.length, 0);
     editor.content.seo_title = 'New SEO';
-    assert.equal(editor.changeEntries[0].label, 'Page title');
+    assert.equal(editor.changeEntries[0].label, 'Meta title (page title)');
 });
 
 test('saving a draft keeps unpublished comparisons until published', async () => {

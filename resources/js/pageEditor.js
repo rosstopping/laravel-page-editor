@@ -186,6 +186,8 @@ export default (initial, fields, endpoint, csrf, exitUrl) => ({
         element?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'center' });
     },
     get metadataFields() { return Object.entries(this.fields).filter(([key, field]) => key === 'seo_title' || key === 'seo_description' || field.meta); },
+    get searchMetadataFields() { return ['seo_title', 'seo_description'].filter(key => this.fields[key]).map(key => [key, this.fields[key]]); },
+    get socialMetadataFields() { return this.metadataFields.filter(([key]) => key !== 'seo_title' && key !== 'seo_description'); },
     layout: 'bottom',
     layoutWide: true,
     layoutMenuOpen: false,
@@ -233,7 +235,7 @@ export default (initial, fields, endpoint, csrf, exitUrl) => ({
         return 'No unsaved changes';
     },
     metadataLabel(key) {
-        const labels = { seo_title: 'Page title', seo_description: 'Search description', 'og:title': 'Social title', 'og:description': 'Social description', 'og:image': 'Social image URL', 'og:image:alt': 'Social image alt text', 'og:url': 'Social page URL', 'og:type': 'Social content type', 'og:site_name': 'Site name' };
+        const labels = { seo_title: 'Meta title (page title)', seo_description: 'Meta description', 'og:title': 'Social title', 'og:description': 'Social description', 'og:image': 'Social image URL', 'og:image:alt': 'Social image alt text', 'og:url': 'Social page URL', 'og:type': 'Social content type', 'og:site_name': 'Site name' };
         const meta = this.fields[key]?.meta;
         return (labels[key] || labels[meta?.name] || this.fieldLabel(key)) + (meta?.index ? ` (${meta.index + 1})` : '');
     },
