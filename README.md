@@ -205,3 +205,7 @@ The metadata panel shows **Search engine metadata** first: **Meta title (page ti
 and **Meta description**. The meta description is the normal HTML description
 used by search engines. **Social sharing tags** appear in a separate group and
 control shared-link previews. Existing saved metadata keys and values are unchanged.
+
+### Collapsing the editor
+
+Choose **Collapse** in the editor bar to hide the entire bottom panel or sidebar behind a small pencil icon. Click the icon to reopen the editor. This choice is remembered in your browser across pages. Collapsing restores the page's normal layout and disables inline editing while preserving unsaved changes; a blue dot on the icon indicates unsaved edits. Save or publish before leaving the page.

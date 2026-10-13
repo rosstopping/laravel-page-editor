@@ -188,6 +188,26 @@ export default (initial, fields, endpoint, csrf, exitUrl) => ({
     get metadataFields() { return Object.entries(this.fields).filter(([key, field]) => key === 'seo_title' || key === 'seo_description' || field.meta); },
     get searchMetadataFields() { return ['seo_title', 'seo_description'].filter(key => this.fields[key]).map(key => [key, this.fields[key]]); },
     get socialMetadataFields() { return this.metadataFields.filter(([key]) => key !== 'seo_title' && key !== 'seo_description'); },
+    collapsed: false,
+    restoreCollapsed() {
+        try { this.collapsed = window.localStorage.getItem('page-editor:collapsed') === 'true'; } catch {}
+        if (this.collapsed) this.preview = true;
+    },
+    setCollapsed(value) {
+        if (this.busy) return;
+        this.checkpoint();
+        this.collapsed = value;
+        this.preview = value;
+        this.layoutMenuOpen = false;
+        this.libraryOpen = false;
+        this.libraryRequest++;
+        if (!value) this.expanded = true;
+        try { window.localStorage.setItem('page-editor:collapsed', String(value)); } catch {}
+        this.$nextTick?.(() => {
+            this.updateDockSpace();
+            (value ? this.$refs.launcher : this.$refs.collapseToggle)?.focus();
+        });
+    },
     layout: 'bottom',
     layoutWide: true,
     layoutMenuOpen: false,
@@ -217,8 +237,9 @@ export default (initial, fields, endpoint, csrf, exitUrl) => ({
         this.$nextTick?.(() => this.$refs.layoutToggle?.focus());
     },
     updateDockSpace() {
-        this.siteLayout?.setActive(this.dockLayout === 'left');
-        const height = this.dockLayout === 'bottom' ? this.$refs.dock.getBoundingClientRect().height : 0;
+        document.body.classList.toggle('cms-editor-open', !this.collapsed);
+        this.siteLayout?.setActive(!this.collapsed && this.dockLayout === 'left');
+        const height = !this.collapsed && this.dockLayout === 'bottom' ? this.$refs.dock.getBoundingClientRect().height : 0;
         document.body.style.setProperty('--cms-dock-height', `${height}px`);
     },
     preview: false,
@@ -268,11 +289,13 @@ export default (initial, fields, endpoint, csrf, exitUrl) => ({
         window.addEventListener('beforeunload', this.warn);
         this.restoreNotification();
         this.restoreLayout();
+        this.restoreCollapsed();
         this.siteLayout = createSiteLayout();
         this.layoutMedia = window.matchMedia('(min-width: 768px)');
         this.layoutWide = this.layoutMedia.matches;
         this.onLayoutMedia = event => { this.layoutWide = event.matches; if (this.layoutMenuOpen) this.closeLayoutMenu(); };
         this.layoutMedia.addEventListener('change', this.onLayoutMedia);
+        this.$watch('collapsed', () => this.$nextTick(() => this.updateDockSpace()));
         this.$watch('dockLayout', () => this.$nextTick(() => this.updateDockSpace()));
         this.bindDocument();
         this.$watch('content', () => { this.syncDocument(); this.trackChange(); });
@@ -293,6 +316,7 @@ export default (initial, fields, endpoint, csrf, exitUrl) => ({
         window.addEventListener('keydown', this.escape);
         document.body.classList.add('cms-editor-open');
         this.$nextTick(() => {
+            this.updateDockSpace();
             this.dockObserver = new ResizeObserver(() => this.updateDockSpace());
             this.dockObserver.observe(this.$refs.dock);
         });

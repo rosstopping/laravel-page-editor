@@ -7,7 +7,11 @@
     </div>
     <button type="button" @click="dismissNotification()" aria-label="Dismiss notification" class="cms-tool__icon">×</button>
 </div>
-<aside class="cms-tool cms-dock" :data-layout="dockLayout" aria-label="Page editor" x-ref="dock" x-cloak>
+<button type="button" x-cloak x-show="collapsed" x-ref="launcher" @click="setCollapsed(false)" class="cms-tool cms-launcher" aria-label="Open page editor" aria-controls="cms-editor-dock" :aria-expanded="!collapsed" :title="dirty ? 'Open page editor — unsaved changes' : 'Open page editor'">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m16 3 5 5-12 12-6 1 1-6L16 3Z"/><path d="m13 6 5 5"/></svg>
+    <span x-show="dirty" class="cms-launcher__dirty" aria-hidden="true"></span>
+</button>
+<aside id="cms-editor-dock" x-show="!collapsed" class="cms-tool cms-dock" :data-layout="dockLayout" aria-label="Page editor" x-ref="dock" x-cloak>
     <div id="cms-editor-panel" x-show="dockLayout === 'left' || (!preview && expanded)">
         <p class="cms-shared-notice cms-code-notice" x-show="Object.values(fields).some(field => field.updated_in_code)" role="status"><strong>Updated in code</strong> Some defaults changed in the page markup. Older CMS edits are ignored; saving removes those overrides and keeps them in revision history.</p>
         <div class="cms-window-heading">
@@ -200,6 +204,7 @@
         </div>
         <div class="cms-bar__actions">
             <div class="cms-bar__workspace" role="group" aria-label="Editor tools">
+            <button type="button" x-ref="collapseToggle" @click="setCollapsed(true)" :disabled="busy" class="cms-tool__button cms-tool__button--quiet" aria-label="Collapse page editor" title="Collapse to an icon">Collapse</button>
             <div class="cms-undo-actions" role="group" aria-label="Edit history">
                 <button type="button" class="cms-tool__button cms-tool__button--quiet" @click="undo()" :disabled="busy || !canUndo" title="Undo (Ctrl/Cmd+Z)">Undo</button>
                 <button type="button" class="cms-tool__button cms-tool__button--quiet" @click="redo()" :disabled="busy || !canRedo" title="Redo (Ctrl/Cmd+Shift+Z)">Redo</button>
@@ -222,7 +227,7 @@
                         <span><strong>Bottom panel</strong><span>More width for browsing and editing.</span></span>
                     </button>
                     <p class="cms-tool__hint" x-show="!layoutWide">On screens below 768px, Bottom panel is always selected.</p>
-                    <p class="cms-tool__hint">Your choice is remembered in this browser. Left stays open; Bottom can be minimised.</p>
+                    <p class="cms-tool__hint">Your choice is remembered in this browser. Collapse hides either layout behind an icon.</p>
                 </div>
             </div>
             <button type="button" @click="preview = !preview" :aria-pressed="preview" class="cms-tool__button cms-tool__button--quiet" x-text="preview ? 'Edit mode' : 'Preview'"></button>

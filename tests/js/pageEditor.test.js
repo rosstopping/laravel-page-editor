@@ -435,3 +435,49 @@ test('search metadata has a stable order and is separate from social tags', () =
     assert.deepEqual(partial.searchMetadataFields.map(([key]) => key), ['seo_description']);
     assert.deepEqual(partial.socialMetadataFields, []);
 });
+
+test('collapse preserves unsaved content, restores normal page space and remembers the choice', () => {
+    const storage = new Map();
+    globalThis.window = { localStorage: { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value) } };
+    const classes = new Set();
+    const properties = new Map();
+    globalThis.document = { body: { classList: { toggle(name, on) { on ? classes.add(name) : classes.delete(name); } }, style: { setProperty(key, value) { properties.set(key, value); } } } };
+    const editor = pageEditor(initial(), {}, '/save', 'token');
+    let active;
+    let focused;
+    editor.siteLayout = { setActive(value) { active = value; } };
+    editor.$nextTick = fn => fn();
+    editor.$refs = { dock: { getBoundingClientRect: () => ({ height: 150 }) }, launcher: { focus() { focused = 'launcher'; } }, collapseToggle: { focus() { focused = 'collapse'; } } };
+    editor.content.title = 'Unsaved draft';
+    editor.layout = 'left';
+    editor.setCollapsed(true);
+    assert.equal(editor.content.title, 'Unsaved draft');
+    assert.equal(editor.dirty, true);
+    assert.equal(editor.preview, true);
+    assert.equal(active, false);
+    assert.equal(classes.has('cms-editor-open'), false);
+    assert.equal(properties.get('--cms-dock-height'), '0px');
+    assert.equal(focused, 'launcher');
+    const reloaded = pageEditor(initial(), {}, '/save', 'token');
+    reloaded.restoreCollapsed();
+    assert.equal(reloaded.collapsed, true);
+    assert.equal(reloaded.preview, true);
+    editor.setCollapsed(false);
+    assert.equal(active, true);
+    assert.equal(editor.preview, false);
+    assert.equal(editor.expanded, true);
+    assert.equal(focused, 'collapse');
+    assert.equal(storage.get('page-editor:collapsed'), 'false');
+    editor.busy = true;
+    editor.setCollapsed(true);
+    assert.equal(editor.collapsed, false);
+});
+
+test('collapse works with blocked browser storage', () => {
+    globalThis.window = { localStorage: { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } } };
+    const editor = pageEditor(initial(), {}, '/save', 'token');
+    editor.restoreCollapsed();
+    editor.setCollapsed(true);
+    assert.equal(editor.collapsed, true);
+    assert.equal(editor.preview, true);
+});

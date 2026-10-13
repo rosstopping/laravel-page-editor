@@ -41,6 +41,21 @@ class PageEditorTest extends TestCase
         return array_key_last(session('page-editor.manifests'));
     }
 
+    public function test_editor_can_collapse_to_an_accessible_icon_in_either_layout(): void
+    {
+        $html = Blade::render('<x-page-editor exit-url="/page" />');
+        $document = new \DOMDocument;
+        @$document->loadHTML($html);
+        $xpath = new \DOMXPath($document);
+        $launcher = $xpath->query('//button[@aria-label="Open page editor"]')->item(0);
+        $this->assertNotNull($launcher);
+        $this->assertSame('collapsed', $launcher->getAttribute('x-show'));
+        $this->assertSame('cms-editor-dock', $launcher->getAttribute('aria-controls'));
+        $dock = $xpath->query('//aside[@id="cms-editor-dock"]')->item(0);
+        $this->assertSame('!collapsed', $dock->getAttribute('x-show'));
+        $this->assertSame(1, $xpath->query('//button[@aria-label="Collapse page editor"]')->length);
+    }
+
     public function test_metadata_panel_separates_search_and_social_fields(): void
     {
         $html = Blade::render('<x-page-editor exit-url="/page" />');
