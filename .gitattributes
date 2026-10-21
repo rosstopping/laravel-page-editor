@@ -1,0 +1,7 @@
+# Exclude development files from release archives
+/.gitattributes export-ignore
+/tests export-ignore
+/build.mjs export-ignore
+/package.json export-ignore
+/ROADMAP.md export-ignore
+/SECURITY-AUDIT.md export-ignore
