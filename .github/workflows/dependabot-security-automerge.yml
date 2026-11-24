@@ -25,10 +25,9 @@ jobs:
     steps:
       - name: Verify signed Dependabot update and security alert
         id: metadata
-        uses: dependabot/fetch-metadata@d7267f607e9d3fb96fc2fbe83e0af444713e90b7
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98
         with:
           github-token: ${{ github.token }}
-          alert-lookup: true
       - name: Merge verified security update after CI
         env:
           GH_TOKEN: ${{ github.token }}
@@ -36,7 +35,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           BASE_BRANCH: ${{ github.event.repository.default_branch }}
-          ALERT_STATE: ${{ steps.metadata.outputs.alert-state }}
+          UPDATED_DEPENDENCIES: ${{ steps.metadata.outputs.updated-dependencies-json }}
           UPDATE_TYPE: ${{ steps.metadata.outputs.update-type }}
           ECOSYSTEM: ${{ steps.metadata.outputs.package-ecosystem }}
         shell: bash
@@ -48,6 +47,8 @@ jobs:
            p=subprocess.run(['gh','api','--paginate',path,'--slurp'],text=True,capture_output=True,check=True);pages=json.loads(p.stdout)
            if len(pages)==1:return pages[0]
            if all(isinstance(p,list) for p in pages):return sum(pages,[])
+           for key in ['workflow_runs','check_runs','statuses']:
+            if all(isinstance(p,dict) and key in p for p in pages):return {**pages[0],key:sum([p[key] for p in pages],[])}
            return pages
           def eligible(pr,files):
            if pr['state']!='open' or pr.get('draft') or pr['head']['sha']!=expected:return False
@@ -65,10 +66,43 @@ jobs:
              if lines and all(re.match(r'^\s*-?\s*uses:\s*[^\s]+@[^\s]+(?:\s*#.*)?$',line) for line in lines):continue
             return False
            return True
-          if os.environ.get('ALERT_STATE')!='OPEN' or os.environ.get('UPDATE_TYPE') not in ['version-update:semver-patch','version-update:semver-minor']:
+          def version(value):
+           import re
+           m=re.fullmatch(r'v?(\d+)\.(\d+)(?:\.(\d+))?(?:\.(\d+))?',str(value))
+           return tuple(int(x or 0) for x in m.groups()) if m else None
+          def affected(value,constraint):
+           import re
+           v=version(value)
+           if v is None:return False
+           for group in constraint.replace('||','|').split('|'):
+            tokens=list(re.finditer(r'(<=|>=|<|>|==|=)?\s*v?(\d+(?:\.\d+){0,3})',group));rest=re.sub(r'(<=|>=|<|>|==|=)?\s*v?(\d+(?:\.\d+){0,3})','',group)
+            if rest.replace(',','').strip() or not tokens:continue
+            matches=[]
+            for token in tokens:
+             parts=tuple(int(p) for p in token[2].split('.'));other=parts+(0,)*(4-len(parts));op=token[1] or '='
+             matches.append({'<':v<other,'<=':v<=other,'>':v>other,'>=':v>=other,'=':v==other,'==':v==other}[op])
+            if all(matches):return True
+           return False
+          def fixed_alerts(deps,alerts):
+           fixed=[]
+           for dep in deps:
+            prev=dep.get('prevVersion','');new=dep.get('newVersion','');new_v=version(new)
+            if new_v is None:continue
+            directory=pathlib.PurePosixPath('/'+dep.get('directory','/').strip('/'))
+            for alert in alerts:
+             if alert['state']!='open' or alert['dependency']['package']['name']!=dep['dependencyName']:continue
+             manifest=pathlib.PurePosixPath('/'+alert['dependency']['manifest_path'].lstrip('/'))
+             if manifest.parent!=directory:continue
+             vulnerability=alert['security_vulnerability'];patch=vulnerability.get('first_patched_version') or {};minimum=version(patch.get('identifier',''))
+             if minimum is not None and new_v>=minimum and affected(prev,vulnerability['vulnerable_version_range']) and not affected(new,vulnerability['vulnerable_version_range']):fixed.append(alert['number'])
+           return sorted(set(fixed))
+          if os.environ.get('UPDATE_TYPE') not in ['version-update:semver-patch','version-update:semver-minor']:
            print('This PR needs manual review.');sys.exit(0)
           pr=api(f'repos/{repo}/pulls/{number}');files=api(f'repos/{repo}/pulls/{number}/files')
           if not eligible(pr,files):print('PR provenance or file scope needs manual review.');sys.exit(0)
+          deps=json.loads(os.environ['UPDATED_DEPENDENCIES']);alerts=api(f'repos/{repo}/dependabot/alerts?state=open&per_page=100');fixed=fixed_alerts(deps,alerts)
+          if not fixed:print('No matching open alert is demonstrably fixed. Leaving PR open.');sys.exit(0)
+          print('Verified fixes for security alerts: '+', '.join(str(n) for n in fixed))
           for attempt in range(120):
            pr=api(f'repos/{repo}/pulls/{number}')
            if not eligible(pr,files):print('PR changed while waiting.');sys.exit(0)
