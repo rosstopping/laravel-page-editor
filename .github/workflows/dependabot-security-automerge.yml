@@ -103,6 +103,7 @@ jobs:
           deps=json.loads(os.environ['UPDATED_DEPENDENCIES']);alerts=api(f'repos/{repo}/dependabot/alerts?state=open&per_page=100');fixed=fixed_alerts(deps,alerts)
           if not fixed:print('No matching open alert is demonstrably fixed. Leaving PR open.');sys.exit(0)
           print('Verified fixes for security alerts: '+', '.join(str(n) for n in fixed))
+          workflow_cache={}
           for attempt in range(120):
            pr=api(f'repos/{repo}/pulls/{number}')
            if not eligible(pr,files):print('PR changed while waiting.');sys.exit(0)
@@ -113,7 +114,19 @@ jobs:
             if ci['status']=='completed':
              checks=api(f'repos/{repo}/commits/{expected}/check-runs?filter=latest&per_page=100')
              checks=checks if isinstance(checks,list) else [checks];checks=[c for page in checks for c in page.get('check_runs',[])]
-             checks=[c for c in checks if not (c['name']=='Security update merge' and c.get('app',{}).get('slug')=='github-actions' and '/runs/'+os.environ['GITHUB_RUN_ID']+'/' in c.get('details_url',''))]
+             import re
+             latest_checks={}
+             for check in sorted(checks,key=lambda c:c['id'],reverse=True):
+              slug=check.get('app',{}).get('slug','');workflow=None
+              match=re.fullmatch(r'https://github.com/'+re.escape(repo)+r'/actions/runs/(\d+)/job/\d+(?:\?.*)?',check.get('details_url',''))
+              if slug=='github-actions' and match:
+               run_id=match[1]
+               if run_id not in workflow_cache:workflow_cache[run_id]=api(f'repos/{repo}/actions/runs/{run_id}')
+               workflow=workflow_cache[run_id]
+               if workflow.get('path')=='.github/workflows/dependabot-security-automerge.yml':continue
+              key=(slug,(workflow or {}).get('workflow_id'),check['name'])
+              latest_checks.setdefault(key,check)
+             checks=list(latest_checks.values())
              statuses=api(f'repos/{repo}/commits/{expected}/status').get('statuses',[])
              # Dependabot PRs can produce multiple statuses per context. Only the newest applies.
              latest={}
