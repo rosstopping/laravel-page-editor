@@ -1,0 +1,18 @@
+name: Dependabot alert permission check
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  vulnerability-alerts: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify built-in security-alert access
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GH_REPO/dependabot/alerts?per_page=1" --jq 'length' >/dev/null
+          echo 'Built-in read-only Dependabot alert permission verified.'
