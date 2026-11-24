@@ -113,6 +113,7 @@ jobs:
             if ci['status']=='completed':
              checks=api(f'repos/{repo}/commits/{expected}/check-runs?filter=latest&per_page=100')
              checks=checks if isinstance(checks,list) else [checks];checks=[c for page in checks for c in page.get('check_runs',[])]
+             checks=[c for c in checks if not (c['name']=='Security update merge' and c.get('app',{}).get('slug')=='github-actions' and '/runs/'+os.environ['GITHUB_RUN_ID']+'/' in c.get('details_url',''))]
              statuses=api(f'repos/{repo}/commits/{expected}/status').get('statuses',[])
              # Dependabot PRs can produce multiple statuses per context. Only the newest applies.
              latest={}
